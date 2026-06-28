@@ -637,15 +637,8 @@ function renderSlots() {
 }
 
 function handleSlotClick(pieceType) {
-  const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
-  if (picks[pieceType]) {
-    delete picks[pieceType];
-    dbState.activeSlot = null;
-    setStatus(`${PIECE_NAMES[pieceType]} card removed. Pick a slot.`, 'ok');
-  } else {
-    dbState.activeSlot = pieceType;
-    setStatus(`Pick a card for ${PIECE_NAMES[pieceType]} from the pool below`, 'ok');
-  }
+  dbState.activeSlot = pieceType;
+  setStatus(`Pick a card for ${PIECE_NAMES[pieceType]} from the pool below`, 'ok');
   renderSlots();
   renderPoolCards();
   updateConfirmBtn();
