@@ -653,6 +653,9 @@ function wouldMakeValid(pieceType, pathType, picks) {
   const remaining = 5 - filled;
   const counts = { movement: 0, attack: 0, defense: 0 };
   for (const pt of Object.values(test)) { if (counts[pt] !== undefined) counts[pt]++; }
+  for (const p of ['movement', 'attack', 'defense']) {
+    if (counts[p] > 3) return false;
+  }
   const needed = ['movement', 'attack', 'defense'].filter(p => counts[p] === 0);
   return remaining >= needed.length;
 }
@@ -663,7 +666,7 @@ function assignCard(pieceType, pathType) {
     dbState.activeSlot = null;
     renderSlots();
     renderPoolCards();
-    setStatus(`Can't pick that — deck needs at least 1 Movement, 1 Attack, and 1 Defense card.`, 'err');
+    setStatus(`Can't pick that — deck must have 1-3 of each path type and at least 1 of each.`, 'err');
     return;
   }
   picks[pieceType] = pathType;
