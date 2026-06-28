@@ -690,8 +690,9 @@ function renderPoolCards() {
       const data = CARD_DATA[pieceType][pathType];
       const card = new Card(pieceType, pathType);
       const isTakenByCurrent = picks[pieceType] === pathType;
+      const slotFilled = picks[pieceType] !== undefined;
       const isTakenByOther = otherPicks[pieceType] === pathType;
-      const isTaken = isTakenByCurrent || isTakenByOther;
+      const isTaken = isTakenByCurrent || isTakenByOther || slotFilled;
 
       const div = document.createElement('div');
       div.className = 'pool-card path-' + pathType + (isTaken ? ' taken' : '');
