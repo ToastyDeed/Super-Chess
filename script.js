@@ -538,120 +538,225 @@ class ChessGame {
   }
 }
 
-let deckBuilderState = { w: {}, b: {} };
+let dbState = { turn: 'w', activeSlot: null, w: {}, b: {} };
 let poolFilter = 'all';
 
 function initDeckBuilder() {
-  const modal = document.getElementById('deck-builder');
-  modal.classList.remove('hidden');
-  document.getElementById('start-game-btn').disabled = true;
-  deckBuilderState = {
-    w: {},
-    b: {}
-  };
+  document.getElementById('deck-builder').classList.remove('hidden');
+  dbState = { turn: 'w', activeSlot: null, w: {}, b: {} };
   poolFilter = 'all';
+  document.getElementById('db-confirm-btn').disabled = true;
+  document.getElementById('db-confirm-btn').textContent = "Confirm Picks & Continue";
+  updateTurnUI();
+  renderSlots();
   renderPoolCards();
-  updateDeckDisplay('w');
-  updateDeckDisplay('b');
+  setStatus('Click a piece slot above, then click a card from the pool', 'ok');
+}
+
+function updateTurnUI() {
+  const el = document.getElementById('db-turn-indicator');
+  if (dbState.turn === 'w') {
+    el.className = 'db-turn-w';
+    el.textContent = "White's turn — click a piece slot, then click a card from the pool";
+  } else {
+    el.className = 'db-turn-b';
+    el.textContent = "Black's turn — click a piece slot, then click a card from the pool";
+  }
+  document.querySelectorAll('.db-slot').forEach(s => {
+    s.dataset.color = dbState.turn;
+    const piece = s.dataset.piece;
+    const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
+    if (picks[piece]) s.classList.add('filled');
+    else s.classList.remove('filled');
+  });
+}
+
+function renderSlots() {
+  const container = document.getElementById('db-slots');
+  container.innerHTML = '';
+  for (const pieceType of PIECE_ORDER) {
+    const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
+    const pathType = picks[pieceType];
+    const data = pathType ? CARD_DATA[pieceType][pathType] : null;
+    const slot = document.createElement('div');
+    slot.className = 'db-slot' + (pathType ? ' filled' : '') + (dbState.activeSlot === pieceType ? ' active' : '');
+    slot.dataset.piece = pieceType;
+    slot.dataset.color = dbState.turn;
+    const pieceNames = { pawn: 'Pawn', knight: 'Knight', bishop: 'Bishop', rook: 'Rook', queen: 'Queen' };
+    const unicodeMap = { pawn: '&#9817;', knight: '&#9816;', bishop: '&#9815;', rook: '&#9814;', queen: '&#9813;' };
+    
+    slot.innerHTML = `
+      <span class="slot-icon">${unicodeMap[pieceType]}</span>
+      <span class="slot-label">${pieceNames[pieceType]}</span>
+      <span class="slot-card-name">${data ? data.levels[0].name.split(' ')[0] + '...' : '—'}</span>
+    `;
+    slot.addEventListener('click', () => handleSlotClick(pieceType));
+    
+    slot.addEventListener('dragover', (e) => { e.preventDefault(); slot.classList.add('drag-over'); });
+    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+    slot.addEventListener('drop', (e) => {
+      e.preventDefault();
+      slot.classList.remove('drag-over');
+      const data = e.dataTransfer.getData('text/plain');
+      if (data) {
+        const [pType, pathT] = data.split(',');
+        assignCard(pType, pathT);
+      }
+    });
+    container.appendChild(slot);
+  }
+}
+
+function handleSlotClick(pieceType) {
+  const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
+  if (picks[pieceType]) {
+    delete picks[pieceType];
+    dbState.activeSlot = null;
+    setStatus(`${pieceType.charAt(0).toUpperCase() + pieceType.slice(1)} card removed. Pick a slot.`, 'ok');
+  } else {
+    dbState.activeSlot = pieceType;
+    setStatus(`Pick a card for ${pieceType.charAt(0).toUpperCase() + pieceType.slice(1)} from the pool below`, 'ok');
+  }
+  renderSlots();
+  renderPoolCards();
+  updateConfirmBtn();
+}
+
+function assignCard(pieceType, pathType) {
+  const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
+  picks[pieceType] = pathType;
+  dbState.activeSlot = null;
+  renderSlots();
+  renderPoolCards();
+  updateConfirmBtn();
+  
+  const allFilled = PIECE_ORDER.every(pt => picks[pt]);
+  if (allFilled) {
+    setStatus('All slots filled! Click "Confirm Picks" to continue.', 'ok');
+  } else {
+    const next = PIECE_ORDER.find(pt => !picks[pt]);
+    setStatus(`${next.charAt(0).toUpperCase() + next.slice(1)} is empty. Click its slot, then pick a card.`, 'ok');
+  }
 }
 
 function renderPoolCards() {
   const container = document.getElementById('pool-cards');
   container.innerHTML = '';
+  const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
+  const otherPicks = dbState.turn === 'w' ? dbState.b : dbState.w;
+
   for (const pieceType of PIECE_ORDER) {
     for (const pathType of [PATH_TYPES.MOVEMENT, PATH_TYPES.ATTACK, PATH_TYPES.DEFENSE]) {
       if (poolFilter !== 'all' && pathType !== poolFilter) continue;
       const data = CARD_DATA[pieceType][pathType];
       const card = new Card(pieceType, pathType);
-      const isTakenW = deckBuilderState.w[pieceType] === pathType;
-      const isTakenB = deckBuilderState.b[pieceType] === pathType;
+      const isTakenByCurrent = picks[pieceType] === pathType;
+      const isTakenByOther = otherPicks[pieceType] === pathType;
+      const isTaken = isTakenByCurrent || isTakenByOther;
+      const isCurrentSlot = dbState.activeSlot === pieceType;
+      
       const div = document.createElement('div');
-      div.className = 'pool-card';
-      const labelW = isTakenW ? 'W' : '';
-      const labelB = isTakenB ? 'B' : '';
+      div.className = 'pool-card' + (isTaken ? ' taken' : '');
+      div.draggable = !isTaken;
       div.innerHTML = `
         <span class="pc-icon">${data.emoji}</span>
         <span class="pc-piece">${card.pieceName}</span>
         <span class="pc-path">${data.name}</span>
         <div class="pc-name">${data.levels[0].name} → ${data.levels[2].name}</div>
-        <div class="pc-levels">3 levels: ${data.levels.map(l => l.name).join(' · ')}</div>
-        <div style="margin-top:4px;font-size:0.7rem;color:${isTakenW ? '#ffd700' : '#666'}">${labelW ? 'White selected' : ''} ${labelW && labelB ? ' | ' : ''} ${labelB ? 'Black selected' : ''}</div>
+        <div class="pc-levels">${data.levels[0].description.slice(0, 50)}${data.levels[0].description.length > 50 ? '...' : ''}</div>
+        ${isTakenByOther ? '<div style="font-size:0.65rem;color:#ff6;margin-top:2px">Taken by opponent</div>' : ''}
+        ${isTakenByCurrent ? '<div style="font-size:0.65rem;color:#4c4;margin-top:2px">✓ Selected</div>' : ''}
       `;
-      if (!isTakenW || !isTakenB) {
-        div.addEventListener('click', () => handlePoolCardClick(pieceType, pathType));
+      
+      if (!isTaken && (dbState.activeSlot || !isTakenByCurrent)) {
+        if (dbState.activeSlot && dbState.activeSlot === pieceType) {
+          div.addEventListener('click', () => assignCard(pieceType, pathType));
+        } else if (!dbState.activeSlot && !isTakenByCurrent) {
+          div.addEventListener('click', () => {
+            dbState.activeSlot = pieceType;
+            renderSlots();
+            renderPoolCards();
+            setStatus(`Pick a card for ${pieceType.charAt(0).toUpperCase() + pieceType.slice(1)}`, 'ok');
+          });
+        }
       }
+      
+      div.addEventListener('dragstart', (e) => {
+        if (isTaken) { e.preventDefault(); return; }
+        if (dbState.activeSlot && dbState.activeSlot !== pieceType) { e.preventDefault(); return; }
+        e.dataTransfer.setData('text/plain', `${pieceType},${pathType}`);
+        if (!dbState.activeSlot) {
+          dbState.activeSlot = pieceType;
+          renderSlots();
+        }
+      });
+      
       container.appendChild(div);
     }
   }
 }
 
-function handlePoolCardClick(pieceType, pathType) {
-  const color = deckBuilderState.w[pieceType] ? 'b' : 'w';
-  if (deckBuilderState[color][pieceType] === pathType) {
-    delete deckBuilderState[color][pieceType];
+function updateConfirmBtn() {
+  const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
+  const picked = PIECE_ORDER.filter(pt => picks[pt]);
+  const allFilled = picked.length === 5;
+  
+  if (!allFilled) {
+    document.getElementById('db-confirm-btn').disabled = true;
+    return;
+  }
+  
+  const cards = picked.map(pt => new Card(pt, picks[pt]));
+  const errs = validateDeck(cards);
+  if (errs) {
+    setStatus(errs.join(' | '), 'err');
+    document.getElementById('db-confirm-btn').disabled = true;
   } else {
-    deckBuilderState[color][pieceType] = pathType;
+    setStatus('Deck is valid! Confirm to continue.', 'ok');
+    document.getElementById('db-confirm-btn').disabled = false;
   }
-  updateDeckDisplay('w');
-  updateDeckDisplay('b');
-  renderPoolCards();
 }
 
-function updateDeckDisplay(color) {
-  const container = document.getElementById(`deck-picks-${color}`);
-  container.innerHTML = '';
-  let filledCount = 0;
-  for (const pieceType of PIECE_ORDER) {
-    const slot = document.createElement('div');
-    const pathType = deckBuilderState[color][pieceType];
-    if (pathType) {
-      filledCount++;
-      const data = CARD_DATA[pieceType][pathType];
-      const card = new Card(pieceType, pathType);
-      slot.className = 'deck-pick-slot filled';
-      slot.innerHTML = `
-        <span class="slot-piece">${data.emoji} ${card.pieceName}</span>
-        <span class="slot-path">${data.name}</span>
-        <span class="slot-remove" data-piece="${pieceType}">✕</span>
-      `;
-      slot.querySelector('.slot-remove').addEventListener('click', (e) => {
-        e.stopPropagation();
-        delete deckBuilderState[color][pieceType];
-        updateDeckDisplay(color);
-        renderPoolCards();
-        validateAndUpdate();
-      });
-    } else {
-      slot.className = 'deck-pick-slot';
-      slot.innerHTML = `<span class="slot-piece">${color === 'w' ? '\u2659' : '\u265F'} ${pieceType.charAt(0).toUpperCase() + pieceType.slice(1)}</span><span class="slot-path" style="color:#555">—</span>`;
+function setStatus(msg, type) {
+  const el = document.getElementById('db-status');
+  el.textContent = msg;
+  el.className = type === 'err' ? 'db-status-err' : 'db-status-ok';
+}
+
+function handleConfirm() {
+  const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
+  const cards = PIECE_ORDER.map(pt => new Card(pt, picks[pt]));
+  const errs = validateDeck(cards);
+  if (errs) {
+    setStatus(errs.join(' | '), 'err');
+    return;
+  }
+  
+  if (dbState.turn === 'w') {
+    document.getElementById('db-confirm-btn').disabled = true;
+    document.getElementById('db-confirm-btn').textContent = "Start Game";
+    dbState.turn = 'b';
+    dbState.activeSlot = null;
+    updateTurnUI();
+    renderSlots();
+    renderPoolCards();
+    setStatus("Black's turn! Click a piece slot, then pick a card.", 'ok');
+  } else {
+    whitePlayer = new Player('White', COLORS.WHITE);
+    blackPlayer = new Player('Black', COLORS.BLACK);
+    for (const pieceType of PIECE_ORDER) {
+      whitePlayer.addCard(new Card(pieceType, dbState.w[pieceType]));
+      blackPlayer.addCard(new Card(pieceType, dbState.b[pieceType]));
     }
-    container.appendChild(slot);
+    document.getElementById('deck-builder').classList.add('hidden');
+    if (game) game.init();
+    else { game = new ChessGame(); game.init(); }
   }
-  validateAndUpdate();
 }
 
-function validateAndUpdate() {
-  const cardsW = [];
-  const cardsB = [];
-  for (const pieceType of PIECE_ORDER) {
-    if (deckBuilderState.w[pieceType]) cardsW.push(deckBuilderState.w[pieceType]);
-    if (deckBuilderState.b[pieceType]) cardsB.push(deckBuilderState.b[pieceType]);
-  }
-  const errW = validateDeck(Object.entries(deckBuilderState.w).map(([pt, path]) => new Card(pt, path)));
-  const errB = validateDeck(Object.entries(deckBuilderState.b).map(([pt, path]) => new Card(pt, path)));
-  document.getElementById('deck-errors-w').textContent = errW ? errW.join(' ') : '';
-  document.getElementById('deck-errors-b').textContent = errB ? errB.join(' ') : '';
-  const canStart = !errW && !errB && cardsW.length === 5 && cardsB.length === 5;
-  document.getElementById('start-game-btn').disabled = !canStart;
-}
-
-function handleStartGame() {
-  whitePlayer = new Player('White', COLORS.WHITE);
-  blackPlayer = new Player('Black', COLORS.BLACK);
-  for (const pieceType of PIECE_ORDER) {
-    whitePlayer.addCard(new Card(pieceType, deckBuilderState.w[pieceType]));
-    blackPlayer.addCard(new Card(pieceType, deckBuilderState.b[pieceType]));
-  }
+function handleSkip() {
+  whitePlayer = null;
+  blackPlayer = null;
   document.getElementById('deck-builder').classList.add('hidden');
   if (game) game.init();
   else { game = new ChessGame(); game.init(); }
@@ -680,10 +785,9 @@ function hideCardTooltip() {
   if (existing) existing.remove();
 }
 
-document.getElementById('start-game-btn').addEventListener('click', handleStartGame);
-document.getElementById('reset-btn').addEventListener('click', () => {
-  initDeckBuilder();
-});
+document.getElementById('db-confirm-btn').addEventListener('click', handleConfirm);
+document.getElementById('db-skip-btn').addEventListener('click', handleSkip);
+document.getElementById('reset-btn').addEventListener('click', initDeckBuilder);
 
 document.getElementById('deck-pool').addEventListener('click', (e) => {
   const tab = e.target.closest('.pool-tab');
