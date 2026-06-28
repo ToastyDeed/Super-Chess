@@ -617,15 +617,18 @@ function renderSlots() {
         slot.addEventListener('click', () => handleSlotClick(pieceType));
         slot.addEventListener('dragover', (e) => { e.preventDefault(); slot.classList.add('drag-over'); });
         slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
-        slot.addEventListener('drop', (e) => {
-          e.preventDefault();
-          slot.classList.remove('drag-over');
-          const d = e.dataTransfer.getData('text/plain');
-          if (d) {
-            const [pType, pathT] = d.split(',');
-            if (pType === pieceType) assignCard(pType, pathT);
-          }
-        });
+          slot.addEventListener('drop', (e) => {
+            e.preventDefault();
+            slot.classList.remove('drag-over');
+            const d = e.dataTransfer.getData('text/plain');
+            if (d) {
+              const [pType, pathT] = d.split(',');
+              if (pType === pieceType) {
+                const picks2 = dbState.turn === 'w' ? dbState.w : dbState.b;
+                if (wouldMakeValid(pType, pathT, picks2)) assignCard(pType, pathT);
+              }
+            }
+          });
       }
 
       slotsDiv.appendChild(slot);
@@ -644,8 +647,25 @@ function handleSlotClick(pieceType) {
   updateConfirmBtn();
 }
 
+function wouldMakeValid(pieceType, pathType, picks) {
+  const test = { ...picks, [pieceType]: pathType };
+  const filled = PIECE_ORDER.filter(pt => test[pt]).length;
+  const remaining = 5 - filled;
+  const counts = { movement: 0, attack: 0, defense: 0 };
+  for (const pt of Object.values(test)) { if (counts[pt] !== undefined) counts[pt]++; }
+  const needed = ['movement', 'attack', 'defense'].filter(p => counts[p] === 0);
+  return remaining >= needed.length;
+}
+
 function assignCard(pieceType, pathType) {
   const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
+  if (!wouldMakeValid(pieceType, pathType, picks)) {
+    dbState.activeSlot = null;
+    renderSlots();
+    renderPoolCards();
+    setStatus(`Can't pick that — deck needs at least 1 Movement, 1 Attack, and 1 Defense card.`, 'err');
+    return;
+  }
   picks[pieceType] = pathType;
   dbState.activeSlot = null;
 
