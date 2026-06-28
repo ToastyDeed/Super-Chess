@@ -25,6 +25,7 @@ class ChessGame {
     this.enPassantTarget = null;
     this.gameOver = false;
     this.lastMove = null;
+    this.pendingPromotion = null;
     this.init();
   }
 
@@ -41,6 +42,8 @@ class ChessGame {
     this.enPassantTarget = null;
     this.gameOver = false;
     this.lastMove = null;
+    this.pendingPromotion = null;
+    document.getElementById('promotion-modal').classList.add('hidden');
     this.updateBoard();
   }
 
@@ -288,8 +291,14 @@ class ChessGame {
       this.board[toR][rookFromC] = null;
     }
 
-    if (piece.type === PIECES.PAWN && (toR === 0 || toR === 7))
-      this.board[toR][toC] = { type: PIECES.QUEEN, color: piece.color };
+    if (piece.type === PIECES.PAWN && (toR === 0 || toR === 7)) {
+      this.pendingPromotion = { fromR, fromC, toR, toC, color: piece.color, captured };
+      this.showPromotionModal(toR, toC, piece.color);
+      this.selected = null;
+      this.legalMoves = [];
+      this.updateBoard();
+      return true;
+    }
 
     if (piece.type === PIECES.KING) {
       this.kingPositions[piece.color] = [toR, toC];
@@ -349,7 +358,7 @@ class ChessGame {
   }
 
   selectSquare(row, col) {
-    if (this.gameOver) return;
+    if (this.gameOver || this.pendingPromotion) return;
 
     const piece = this.at(row, col);
 
@@ -375,6 +384,35 @@ class ChessGame {
       this.legalMoves = this.getLegalMoves(row, col);
       this.updateBoard();
     }
+  }
+
+  showPromotionModal(row, col, color) {
+    const choices = document.getElementById('promotion-choices');
+    const types = [PIECES.QUEEN, PIECES.ROOK, PIECES.BISHOP, PIECES.KNIGHT];
+    choices.innerHTML = '';
+    for (const type of types) {
+      const el = document.createElement('div');
+      el.className = 'promo-option';
+      el.classList.add(color === 'w' ? 'piece-white' : 'piece-black');
+      el.dataset.piece = type;
+      el.innerHTML = UNICODE[color + type];
+      el.addEventListener('click', () => this.completePromotion(type));
+      choices.appendChild(el);
+    }
+    document.getElementById('promotion-modal').classList.remove('hidden');
+  }
+
+  completePromotion(type) {
+    const { toR, toC, color, fromR, fromC, captured } = this.pendingPromotion;
+    this.board[toR][toC] = { type, color };
+    this.enPassantTarget = null;
+    this.lastMove = [[fromR, fromC], [toR, toC]];
+    this.moveHistory.push({ from: [fromR, fromC], to: [toR, toC], piece: { type: PIECES.PAWN, color }, captured });
+    this.turn = this.turn === COLORS.WHITE ? COLORS.BLACK : COLORS.WHITE;
+    this.pendingPromotion = null;
+    document.getElementById('promotion-modal').classList.add('hidden');
+    this.checkGameState();
+    this.updateBoard();
   }
 
   updateBoard() {
