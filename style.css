@@ -397,6 +397,9 @@ h1 {
   border-color: #4a8a4a;
   background: #1a2a1a;
 }
+.db-slot.filled.path-movement { border-color: #4caf50; }
+.db-slot.filled.path-attack { border-color: #f44336; }
+.db-slot.filled.path-defense { border-color: #2196f3; }
 
 .db-slot.filled.active {
   border-color: #ffd700;
@@ -436,7 +439,11 @@ h1 {
   font-size: 0.65rem;
   color: #8f8;
   min-height: 1em;
+  font-weight: 600;
 }
+.db-slot .slot-card-name.path-movement { color: #66bb6a; }
+.db-slot .slot-card-name.path-attack { color: #ef5350; }
+.db-slot .slot-card-name.path-defense { color: #42a5f5; }
 
 #db-status {
   text-align: center;

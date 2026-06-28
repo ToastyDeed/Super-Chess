@@ -596,9 +596,11 @@ function renderSlots() {
       const isFilled = !!pathType;
       const isActive = isCurrent && dbState.activeSlot === pieceType;
 
+      const PATH_LABELS = { movement: 'Movement', attack: 'Attack', defense: 'Defense' };
+
       const slot = document.createElement('div');
       slot.className = 'db-slot';
-      if (isFilled) slot.classList.add('filled');
+      if (isFilled) slot.classList.add('filled', 'path-' + pathType);
       if (isActive) slot.classList.add('active');
       if (!isCurrent) slot.classList.add('opponent');
 
@@ -608,24 +610,22 @@ function renderSlots() {
       slot.innerHTML = `
         <span class="slot-icon">${SLOT_UNICODE[pieceType]}</span>
         <span class="slot-label">${PIECE_NAMES[pieceType]}</span>
-        <span class="slot-card-name">${data ? data.levels[0].name.split(' ')[0] + '...' : '—'}</span>
+        <span class="slot-card-name ${data ? 'path-' + pathType : ''}">${data ? PATH_LABELS[pathType] : '—'}</span>
       `;
 
-      if (isCurrent) {
+      if (isCurrent && !isFilled) {
         slot.addEventListener('click', () => handleSlotClick(pieceType));
-        if (!isFilled) {
-          slot.addEventListener('dragover', (e) => { e.preventDefault(); slot.classList.add('drag-over'); });
-          slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
-          slot.addEventListener('drop', (e) => {
-            e.preventDefault();
-            slot.classList.remove('drag-over');
-            const d = e.dataTransfer.getData('text/plain');
-            if (d) {
-              const [pType, pathT] = d.split(',');
-              if (pType === pieceType) assignCard(pType, pathT);
-            }
-          });
-        }
+        slot.addEventListener('dragover', (e) => { e.preventDefault(); slot.classList.add('drag-over'); });
+        slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+        slot.addEventListener('drop', (e) => {
+          e.preventDefault();
+          slot.classList.remove('drag-over');
+          const d = e.dataTransfer.getData('text/plain');
+          if (d) {
+            const [pType, pathT] = d.split(',');
+            if (pType === pieceType) assignCard(pType, pathT);
+          }
+        });
       }
 
       slotsDiv.appendChild(slot);
