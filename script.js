@@ -197,12 +197,10 @@ class ChessGame {
     if (!rook || rook.type !== PIECES.ROOK || rook.color !== color) return false;
 
     const step = rCol === 0 ? -1 : 1;
-    const endCol = rCol === 0 ? 3 : 5;
-    for (let c = kCol + step; c !== endCol + step; c += step) {
-      if (c === kCol) continue;
+    for (let c = kCol + step; c !== rCol; c += step) {
       if (board[backRow][c]) return false;
     }
-    for (let c = kCol; c !== endCol + step; c += step) {
+    for (let c = kCol; c !== (rCol === 0 ? 2 : 6); c += step) {
       if (this.isSquareAttacked(backRow, c, enemy, board)) return false;
     }
     return true;
@@ -519,8 +517,8 @@ class ChessGame {
         `;
         if (!card.isMaxLevel()) {
           const btn = document.createElement('button');
-          btn.className = 'card-lvl-btn' + (player.canAffordLevelUp(i) ? '' : '');
-          btn.textContent = player.canAffordLevelUp(i) ? `${card.getLevelUpCost()} pts` : `${card.getLevelUpCost()} pts`;
+          btn.className = 'card-lvl-btn';
+          btn.textContent = `${card.getLevelUpCost()} pts`;
           btn.disabled = !player.canAffordLevelUp(i);
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
