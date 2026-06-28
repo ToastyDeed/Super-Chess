@@ -337,9 +337,30 @@ h1 {
 
 #db-slots {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin-bottom: 8px;
-  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.db-player-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.db-player-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  min-width: 42px;
+  text-align: right;
+  color: #aaa;
+  flex-shrink: 0;
+}
+
+.db-slots-row {
+  display: flex;
+  gap: 6px;
+  flex: 1;
 }
 
 .db-slot {
@@ -380,6 +401,19 @@ h1 {
 .db-slot.filled.active {
   border-color: #ffd700;
   box-shadow: 0 0 12px rgba(255,215,0,0.3);
+}
+
+.db-slot.opponent {
+  opacity: 0.55;
+  cursor: default;
+  border-color: #333;
+  background: #111;
+  pointer-events: none;
+}
+.db-slot.opponent:hover {
+  border-color: #333;
+  background: #111;
+  transform: none;
 }
 
 .db-slot.drag-over {
@@ -477,14 +511,37 @@ h1 {
 .pool-card.taken {
   opacity: 0.3;
   cursor: not-allowed;
-  border-color: #333;
+  border-color: #333 !important;
   background: #111;
   transform: none;
 }
 
+.pool-card.path-movement { border-color: #4caf50; }
+.pool-card.path-movement:hover { border-color: #66bb6a; }
+.pool-card.path-attack { border-color: #f44336; }
+.pool-card.path-attack:hover { border-color: #ef5350; }
+.pool-card.path-defense { border-color: #2196f3; }
+.pool-card.path-defense:hover { border-color: #42a5f5; }
+
+.pc-path.path-movement { color: #66bb6a; }
+.pc-path.path-attack { color: #ef5350; }
+.pc-path.path-defense { color: #42a5f5; }
+
 .pool-card .pc-icon {
   font-size: 1.2rem;
   margin-right: 4px;
+}
+
+.pc-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.pool-card .pc-chess-icon {
+  font-size: 1.3rem;
+  line-height: 1;
 }
 
 .pool-card .pc-piece {

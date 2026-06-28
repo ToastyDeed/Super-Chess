@@ -538,72 +538,101 @@ class ChessGame {
   }
 }
 
-let dbState = { turn: 'w', activeSlot: null, w: {}, b: {} };
+const CHESS_UNICODE = { pawn: '♟', knight: '♞', bishop: '♝', rook: '♜', queen: '♛' };
+const SLOT_UNICODE = { pawn: '&#9817;', knight: '&#9816;', bishop: '&#9815;', rook: '&#9814;', queen: '&#9813;' };
+const PIECE_NAMES = { pawn: 'Pawn', knight: 'Knight', bishop: 'Bishop', rook: 'Rook', queen: 'Queen' };
+
+let dbState = { turn: 'b', activeSlot: null, w: {}, b: {} };
 let poolFilter = 'all';
 
 function initDeckBuilder() {
   document.getElementById('deck-builder').classList.remove('hidden');
-  dbState = { turn: 'w', activeSlot: null, w: {}, b: {} };
+  dbState = { turn: 'b', activeSlot: null, w: {}, b: {} };
   poolFilter = 'all';
   document.getElementById('db-confirm-btn').disabled = true;
-  document.getElementById('db-confirm-btn').textContent = "Confirm Picks & Continue";
+  document.getElementById('db-confirm-btn').textContent = "Start Game";
   updateTurnUI();
   renderSlots();
   renderPoolCards();
-  setStatus('Click a piece slot above, then click a card from the pool', 'ok');
+  setStatus('Black picks first — click a piece slot, then pick a card from the pool below', 'ok');
 }
 
 function updateTurnUI() {
   const el = document.getElementById('db-turn-indicator');
   if (dbState.turn === 'w') {
     el.className = 'db-turn-w';
-    el.textContent = "White's turn — click a piece slot, then click a card from the pool";
+    el.textContent = "White's turn — click a piece slot, then pick a card from the pool";
   } else {
     el.className = 'db-turn-b';
-    el.textContent = "Black's turn — click a piece slot, then click a card from the pool";
+    el.textContent = "Black's turn — click a piece slot, then pick a card from the pool";
   }
-  document.querySelectorAll('.db-slot').forEach(s => {
-    s.dataset.color = dbState.turn;
-    const piece = s.dataset.piece;
-    const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
-    if (picks[piece]) s.classList.add('filled');
-    else s.classList.remove('filled');
-  });
 }
 
 function renderSlots() {
   const container = document.getElementById('db-slots');
   container.innerHTML = '';
-  for (const pieceType of PIECE_ORDER) {
-    const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
-    const pathType = picks[pieceType];
-    const data = pathType ? CARD_DATA[pieceType][pathType] : null;
-    const slot = document.createElement('div');
-    slot.className = 'db-slot' + (pathType ? ' filled' : '') + (dbState.activeSlot === pieceType ? ' active' : '');
-    slot.dataset.piece = pieceType;
-    slot.dataset.color = dbState.turn;
-    const pieceNames = { pawn: 'Pawn', knight: 'Knight', bishop: 'Bishop', rook: 'Rook', queen: 'Queen' };
-    const unicodeMap = { pawn: '&#9817;', knight: '&#9816;', bishop: '&#9815;', rook: '&#9814;', queen: '&#9813;' };
-    
-    slot.innerHTML = `
-      <span class="slot-icon">${unicodeMap[pieceType]}</span>
-      <span class="slot-label">${pieceNames[pieceType]}</span>
-      <span class="slot-card-name">${data ? data.levels[0].name.split(' ')[0] + '...' : '—'}</span>
-    `;
-    slot.addEventListener('click', () => handleSlotClick(pieceType));
-    
-    slot.addEventListener('dragover', (e) => { e.preventDefault(); slot.classList.add('drag-over'); });
-    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
-    slot.addEventListener('drop', (e) => {
-      e.preventDefault();
-      slot.classList.remove('drag-over');
-      const data = e.dataTransfer.getData('text/plain');
-      if (data) {
-        const [pType, pathT] = data.split(',');
-        assignCard(pType, pathT);
+
+  const players = [
+    { color: 'b', label: 'Black', picks: dbState.b },
+    { color: 'w', label: 'White', picks: dbState.w }
+  ];
+
+  for (const player of players) {
+    const row = document.createElement('div');
+    row.className = 'db-player-row';
+
+    const label = document.createElement('div');
+    label.className = 'db-player-label';
+    label.textContent = player.label;
+    row.appendChild(label);
+
+    const slotsDiv = document.createElement('div');
+    slotsDiv.className = 'db-slots-row';
+
+    for (const pieceType of PIECE_ORDER) {
+      const pathType = player.picks[pieceType];
+      const data = pathType ? CARD_DATA[pieceType][pathType] : null;
+      const isCurrent = dbState.turn === player.color;
+      const isFilled = !!pathType;
+      const isActive = isCurrent && dbState.activeSlot === pieceType;
+
+      const slot = document.createElement('div');
+      slot.className = 'db-slot';
+      if (isFilled) slot.classList.add('filled');
+      if (isActive) slot.classList.add('active');
+      if (!isCurrent) slot.classList.add('opponent');
+
+      slot.dataset.piece = pieceType;
+      slot.dataset.color = player.color;
+
+      slot.innerHTML = `
+        <span class="slot-icon">${SLOT_UNICODE[pieceType]}</span>
+        <span class="slot-label">${PIECE_NAMES[pieceType]}</span>
+        <span class="slot-card-name">${data ? data.levels[0].name.split(' ')[0] + '...' : '—'}</span>
+      `;
+
+      if (isCurrent) {
+        slot.addEventListener('click', () => handleSlotClick(pieceType));
+        if (!isFilled) {
+          slot.addEventListener('dragover', (e) => { e.preventDefault(); slot.classList.add('drag-over'); });
+          slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+          slot.addEventListener('drop', (e) => {
+            e.preventDefault();
+            slot.classList.remove('drag-over');
+            const d = e.dataTransfer.getData('text/plain');
+            if (d) {
+              const [pType, pathT] = d.split(',');
+              if (pType === pieceType) assignCard(pType, pathT);
+            }
+          });
+        }
       }
-    });
-    container.appendChild(slot);
+
+      slotsDiv.appendChild(slot);
+    }
+
+    row.appendChild(slotsDiv);
+    container.appendChild(row);
   }
 }
 
@@ -612,10 +641,10 @@ function handleSlotClick(pieceType) {
   if (picks[pieceType]) {
     delete picks[pieceType];
     dbState.activeSlot = null;
-    setStatus(`${pieceType.charAt(0).toUpperCase() + pieceType.slice(1)} card removed. Pick a slot.`, 'ok');
+    setStatus(`${PIECE_NAMES[pieceType]} card removed. Pick a slot.`, 'ok');
   } else {
     dbState.activeSlot = pieceType;
-    setStatus(`Pick a card for ${pieceType.charAt(0).toUpperCase() + pieceType.slice(1)} from the pool below`, 'ok');
+    setStatus(`Pick a card for ${PIECE_NAMES[pieceType]} from the pool below`, 'ok');
   }
   renderSlots();
   renderPoolCards();
@@ -626,16 +655,33 @@ function assignCard(pieceType, pathType) {
   const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
   picks[pieceType] = pathType;
   dbState.activeSlot = null;
+
+  const currentDone = PIECE_ORDER.every(pt => picks[pt]);
+  const otherPicks = dbState.turn === 'w' ? dbState.b : dbState.w;
+  const otherDone = PIECE_ORDER.every(pt => otherPicks[pt]);
+
+  if (currentDone && otherDone) {
+    const el = document.getElementById('db-turn-indicator');
+    el.className = 'db-turn-w';
+    el.textContent = 'Both players ready! Click "Start Game" above.';
+    renderSlots();
+    renderPoolCards();
+    updateConfirmBtn();
+    setStatus('Both players ready! Click "Start Game" to begin.', 'ok');
+    return;
+  }
+
+  dbState.turn = dbState.turn === 'w' ? 'b' : 'w';
+  updateTurnUI();
   renderSlots();
   renderPoolCards();
   updateConfirmBtn();
-  
-  const allFilled = PIECE_ORDER.every(pt => picks[pt]);
-  if (allFilled) {
-    setStatus('All slots filled! Click "Confirm Picks" to continue.', 'ok');
+
+  if (currentDone) {
+    setStatus(`${dbState.turn === 'w' ? 'White' : 'Black'} has all slots filled! ${dbState.turn === 'w' ? "White's" : "Black's"} turn to pick.`, 'ok');
   } else {
-    const next = PIECE_ORDER.find(pt => !picks[pt]);
-    setStatus(`${next.charAt(0).toUpperCase() + next.slice(1)} is empty. Click its slot, then pick a card.`, 'ok');
+    const next = PIECE_ORDER.find(pt => !(dbState.turn === 'w' ? dbState.w : dbState.b)[pt]);
+    setStatus(`${dbState.turn === 'w' ? "White's" : "Black's"} turn — pick a card for ${PIECE_NAMES[next]}`, 'ok');
   }
 }
 
@@ -653,34 +699,34 @@ function renderPoolCards() {
       const isTakenByCurrent = picks[pieceType] === pathType;
       const isTakenByOther = otherPicks[pieceType] === pathType;
       const isTaken = isTakenByCurrent || isTakenByOther;
-      const isCurrentSlot = dbState.activeSlot === pieceType;
-      
+
       const div = document.createElement('div');
-      div.className = 'pool-card' + (isTaken ? ' taken' : '');
+      div.className = 'pool-card path-' + pathType + (isTaken ? ' taken' : '');
       div.draggable = !isTaken;
       div.innerHTML = `
-        <span class="pc-icon">${data.emoji}</span>
-        <span class="pc-piece">${card.pieceName}</span>
-        <span class="pc-path">${data.name}</span>
+        <div class="pc-header">
+          <span class="pc-chess-icon">${CHESS_UNICODE[pieceType]}</span>
+          <span class="pc-piece">${card.pieceName}</span>
+          <span class="pc-icon">${data.emoji}</span>
+        </div>
+        <span class="pc-path path-${pathType}">${data.name}</span>
         <div class="pc-name">${data.levels[0].name} → ${data.levels[2].name}</div>
         <div class="pc-levels">${data.levels[0].description.slice(0, 50)}${data.levels[0].description.length > 50 ? '...' : ''}</div>
         ${isTakenByOther ? '<div style="font-size:0.65rem;color:#ff6;margin-top:2px">Taken by opponent</div>' : ''}
         ${isTakenByCurrent ? '<div style="font-size:0.65rem;color:#4c4;margin-top:2px">✓ Selected</div>' : ''}
       `;
-      
-      if (!isTaken && (dbState.activeSlot || !isTakenByCurrent)) {
-        if (dbState.activeSlot && dbState.activeSlot === pieceType) {
-          div.addEventListener('click', () => assignCard(pieceType, pathType));
-        } else if (!dbState.activeSlot && !isTakenByCurrent) {
-          div.addEventListener('click', () => {
-            dbState.activeSlot = pieceType;
-            renderSlots();
-            renderPoolCards();
-            setStatus(`Pick a card for ${pieceType.charAt(0).toUpperCase() + pieceType.slice(1)}`, 'ok');
-          });
-        }
+
+      if (!isTaken && dbState.activeSlot === pieceType) {
+        div.addEventListener('click', () => assignCard(pieceType, pathType));
+      } else if (!isTaken && !dbState.activeSlot && !isTakenByCurrent) {
+        div.addEventListener('click', () => {
+          dbState.activeSlot = pieceType;
+          renderSlots();
+          renderPoolCards();
+          setStatus(`Pick a card for ${PIECE_NAMES[pieceType]}`, 'ok');
+        });
       }
-      
+
       div.addEventListener('dragstart', (e) => {
         if (isTaken) { e.preventDefault(); return; }
         if (dbState.activeSlot && dbState.activeSlot !== pieceType) { e.preventDefault(); return; }
@@ -690,30 +736,35 @@ function renderPoolCards() {
           renderSlots();
         }
       });
-      
+
       container.appendChild(div);
     }
   }
 }
 
 function updateConfirmBtn() {
-  const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
-  const picked = PIECE_ORDER.filter(pt => picks[pt]);
-  const allFilled = picked.length === 5;
-  
-  if (!allFilled) {
-    document.getElementById('db-confirm-btn').disabled = true;
+  const btn = document.getElementById('db-confirm-btn');
+  const wDone = PIECE_ORDER.every(pt => dbState.w[pt]);
+  const bDone = PIECE_ORDER.every(pt => dbState.b[pt]);
+
+  if (!wDone || !bDone) {
+    btn.disabled = true;
+    btn.textContent = 'Start Game';
     return;
   }
-  
-  const cards = picked.map(pt => new Card(pt, picks[pt]));
-  const errs = validateDeck(cards);
-  if (errs) {
-    setStatus(errs.join(' | '), 'err');
-    document.getElementById('db-confirm-btn').disabled = true;
+
+  const wCards = PIECE_ORDER.map(pt => new Card(pt, dbState.w[pt]));
+  const bCards = PIECE_ORDER.map(pt => new Card(pt, dbState.b[pt]));
+  const wErrs = validateDeck(wCards);
+  const bErrs = validateDeck(bCards);
+
+  if (wErrs || bErrs) {
+    setStatus('Deck validation failed!', 'err');
+    btn.disabled = true;
   } else {
-    setStatus('Deck is valid! Confirm to continue.', 'ok');
-    document.getElementById('db-confirm-btn').disabled = false;
+    setStatus('Both players ready! Click "Start Game" to begin.', 'ok');
+    btn.disabled = false;
+    btn.textContent = 'Start Game';
   }
 }
 
@@ -724,34 +775,17 @@ function setStatus(msg, type) {
 }
 
 function handleConfirm() {
-  const picks = dbState.turn === 'w' ? dbState.w : dbState.b;
-  const cards = PIECE_ORDER.map(pt => new Card(pt, picks[pt]));
-  const errs = validateDeck(cards);
-  if (errs) {
-    setStatus(errs.join(' | '), 'err');
-    return;
+  if (PIECE_ORDER.some(pt => !dbState.w[pt]) || PIECE_ORDER.some(pt => !dbState.b[pt])) return;
+
+  whitePlayer = new Player('White', COLORS.WHITE);
+  blackPlayer = new Player('Black', COLORS.BLACK);
+  for (const pieceType of PIECE_ORDER) {
+    whitePlayer.addCard(new Card(pieceType, dbState.w[pieceType]));
+    blackPlayer.addCard(new Card(pieceType, dbState.b[pieceType]));
   }
-  
-  if (dbState.turn === 'w') {
-    document.getElementById('db-confirm-btn').disabled = true;
-    document.getElementById('db-confirm-btn').textContent = "Start Game";
-    dbState.turn = 'b';
-    dbState.activeSlot = null;
-    updateTurnUI();
-    renderSlots();
-    renderPoolCards();
-    setStatus("Black's turn! Click a piece slot, then pick a card.", 'ok');
-  } else {
-    whitePlayer = new Player('White', COLORS.WHITE);
-    blackPlayer = new Player('Black', COLORS.BLACK);
-    for (const pieceType of PIECE_ORDER) {
-      whitePlayer.addCard(new Card(pieceType, dbState.w[pieceType]));
-      blackPlayer.addCard(new Card(pieceType, dbState.b[pieceType]));
-    }
-    document.getElementById('deck-builder').classList.add('hidden');
-    if (game) game.init();
-    else { game = new ChessGame(); game.init(); }
-  }
+  document.getElementById('deck-builder').classList.add('hidden');
+  if (game) game.init();
+  else { game = new ChessGame(); game.init(); }
 }
 
 function handleSkip() {
