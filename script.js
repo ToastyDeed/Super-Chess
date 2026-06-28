@@ -11,6 +11,14 @@ const UNICODE = {
 
 const FILES = 'abcdefgh';
 
+let whitePlayer = null;
+let blackPlayer = null;
+let game = null;
+
+function getPlayer(color) {
+  return color === COLORS.WHITE ? whitePlayer : blackPlayer;
+}
+
 class ChessGame {
   constructor() {
     this.board = [];
@@ -267,18 +275,21 @@ class ChessGame {
       toR === this.enPassantTarget[0] && toC === this.enPassantTarget[1];
     const isCastle = piece.type === PIECES.KING && Math.abs(toC - fromC) === 2;
 
+    let capturedPieceRef = null;
+
     if (isEnPassant) {
-      const epCaptured = this.at(fromR, toC);
-      if (epCaptured) {
-        if (epCaptured.color === COLORS.WHITE) this.capturedWhite.push(epCaptured);
-        else this.capturedBlack.push(epCaptured);
+      capturedPieceRef = this.at(fromR, toC);
+      if (capturedPieceRef) {
+        if (capturedPieceRef.color === COLORS.WHITE) this.capturedWhite.push(capturedPieceRef);
+        else this.capturedBlack.push(capturedPieceRef);
       }
       this.board[fromR][toC] = null;
     }
 
     if (captured) {
-      if (captured.color === COLORS.WHITE) this.capturedWhite.push(captured);
-      else this.capturedBlack.push(captured);
+      capturedPieceRef = captured;
+      if (capturedPieceRef.color === COLORS.WHITE) this.capturedWhite.push(capturedPieceRef);
+      else this.capturedBlack.push(capturedPieceRef);
     }
 
     this.board[toR][toC] = piece;
@@ -317,6 +328,15 @@ class ChessGame {
       this.enPassantTarget = [(fromR + toR) / 2, fromC];
     else
       this.enPassantTarget = null;
+
+    const player = getPlayer(this.turn);
+    if (player) {
+      player.addPoints(1);
+      if (capturedPieceRef) {
+        const typeMap = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen' };
+        player.addPoints(getCaptureBonus(typeMap[capturedPieceRef.type] || 'pawn'));
+      }
+    }
 
     this.lastMove = [[fromR, fromC], [toR, toC]];
     this.moveHistory.push({ from: [fromR, fromC], to: [toR, toC], piece, captured });
@@ -408,6 +428,14 @@ class ChessGame {
     this.enPassantTarget = null;
     this.lastMove = [[fromR, fromC], [toR, toC]];
     this.moveHistory.push({ from: [fromR, fromC], to: [toR, toC], piece: { type: PIECES.PAWN, color }, captured });
+    const player = getPlayer(this.turn);
+    if (player) {
+      player.addPoints(1);
+      if (captured) {
+        const typeMap = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen' };
+        player.addPoints(getCaptureBonus(typeMap[captured.type] || 'pawn'));
+      }
+    }
     this.turn = this.turn === COLORS.WHITE ? COLORS.BLACK : COLORS.WHITE;
     this.pendingPromotion = null;
     document.getElementById('promotion-modal').classList.add('hidden');
@@ -465,8 +493,205 @@ class ChessGame {
     const bEl = document.getElementById('captured-black');
     wEl.innerHTML = this.capturedWhite.map(p => UNICODE['w' + p.type]).join('');
     bEl.innerHTML = this.capturedBlack.map(p => UNICODE['b' + p.type]).join('');
+    this.updateCardsPanel();
+  }
+
+  updateCardsPanel() {
+    for (const color of [COLORS.WHITE, COLORS.BLACK]) {
+      const player = getPlayer(color);
+      if (!player) continue;
+      const ptsEl = document.getElementById(`points-${color}`);
+      if (ptsEl) ptsEl.textContent = player.points;
+      const slotsEl = document.getElementById(`card-slots-${color}`);
+      if (!slotsEl) continue;
+      slotsEl.innerHTML = '';
+      for (let i = 0; i < player.hand.length; i++) {
+        const card = player.hand[i];
+        const div = document.createElement('div');
+        div.className = 'card-mini' + (card.isMaxLevel() ? ' card-max' : ' card-clickable');
+        div.innerHTML = `
+          <span class="card-icon">${card.emoji}</span>
+          <span class="card-info">
+            <span class="card-name">${card.pieceName}</span>
+            <span class="card-path">${card.pathName}</span>
+          </span>
+          <span class="card-level">Lv${card.currentLevel}/3</span>
+        `;
+        if (!card.isMaxLevel()) {
+          const btn = document.createElement('button');
+          btn.className = 'card-lvl-btn' + (player.canAffordLevelUp(i) ? '' : '');
+          btn.textContent = player.canAffordLevelUp(i) ? `${card.getLevelUpCost()} pts` : `${card.getLevelUpCost()} pts`;
+          btn.disabled = !player.canAffordLevelUp(i);
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (player.purchaseLevelUp(i)) {
+              this.updateCardsPanel();
+            }
+          });
+          div.appendChild(btn);
+        }
+        div.addEventListener('mouseenter', (e) => showCardTooltip(e, card));
+        div.addEventListener('mouseleave', hideCardTooltip);
+        slotsEl.appendChild(div);
+      }
+    }
   }
 }
 
-const game = new ChessGame();
-document.getElementById('reset-btn').addEventListener('click', () => game.init());
+let deckBuilderState = { w: {}, b: {} };
+let poolFilter = 'all';
+
+function initDeckBuilder() {
+  const modal = document.getElementById('deck-builder');
+  modal.classList.remove('hidden');
+  document.getElementById('start-game-btn').disabled = true;
+  deckBuilderState = {
+    w: {},
+    b: {}
+  };
+  poolFilter = 'all';
+  renderPoolCards();
+  updateDeckDisplay('w');
+  updateDeckDisplay('b');
+}
+
+function renderPoolCards() {
+  const container = document.getElementById('pool-cards');
+  container.innerHTML = '';
+  for (const pieceType of PIECE_ORDER) {
+    for (const pathType of [PATH_TYPES.MOVEMENT, PATH_TYPES.ATTACK, PATH_TYPES.DEFENSE]) {
+      if (poolFilter !== 'all' && pathType !== poolFilter) continue;
+      const data = CARD_DATA[pieceType][pathType];
+      const card = new Card(pieceType, pathType);
+      const isTakenW = deckBuilderState.w[pieceType] === pathType;
+      const isTakenB = deckBuilderState.b[pieceType] === pathType;
+      const div = document.createElement('div');
+      div.className = 'pool-card';
+      const labelW = isTakenW ? 'W' : '';
+      const labelB = isTakenB ? 'B' : '';
+      div.innerHTML = `
+        <span class="pc-icon">${data.emoji}</span>
+        <span class="pc-piece">${card.pieceName}</span>
+        <span class="pc-path">${data.name}</span>
+        <div class="pc-name">${data.levels[0].name} → ${data.levels[2].name}</div>
+        <div class="pc-levels">3 levels: ${data.levels.map(l => l.name).join(' · ')}</div>
+        <div style="margin-top:4px;font-size:0.7rem;color:${isTakenW ? '#ffd700' : '#666'}">${labelW ? 'White selected' : ''} ${labelW && labelB ? ' | ' : ''} ${labelB ? 'Black selected' : ''}</div>
+      `;
+      if (!isTakenW || !isTakenB) {
+        div.addEventListener('click', () => handlePoolCardClick(pieceType, pathType));
+      }
+      container.appendChild(div);
+    }
+  }
+}
+
+function handlePoolCardClick(pieceType, pathType) {
+  const color = deckBuilderState.w[pieceType] ? 'b' : 'w';
+  if (deckBuilderState[color][pieceType] === pathType) {
+    delete deckBuilderState[color][pieceType];
+  } else {
+    deckBuilderState[color][pieceType] = pathType;
+  }
+  updateDeckDisplay('w');
+  updateDeckDisplay('b');
+  renderPoolCards();
+}
+
+function updateDeckDisplay(color) {
+  const container = document.getElementById(`deck-picks-${color}`);
+  container.innerHTML = '';
+  let filledCount = 0;
+  for (const pieceType of PIECE_ORDER) {
+    const slot = document.createElement('div');
+    const pathType = deckBuilderState[color][pieceType];
+    if (pathType) {
+      filledCount++;
+      const data = CARD_DATA[pieceType][pathType];
+      const card = new Card(pieceType, pathType);
+      slot.className = 'deck-pick-slot filled';
+      slot.innerHTML = `
+        <span class="slot-piece">${data.emoji} ${card.pieceName}</span>
+        <span class="slot-path">${data.name}</span>
+        <span class="slot-remove" data-piece="${pieceType}">✕</span>
+      `;
+      slot.querySelector('.slot-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        delete deckBuilderState[color][pieceType];
+        updateDeckDisplay(color);
+        renderPoolCards();
+        validateAndUpdate();
+      });
+    } else {
+      slot.className = 'deck-pick-slot';
+      slot.innerHTML = `<span class="slot-piece">${color === 'w' ? '\u2659' : '\u265F'} ${pieceType.charAt(0).toUpperCase() + pieceType.slice(1)}</span><span class="slot-path" style="color:#555">—</span>`;
+    }
+    container.appendChild(slot);
+  }
+  validateAndUpdate();
+}
+
+function validateAndUpdate() {
+  const cardsW = [];
+  const cardsB = [];
+  for (const pieceType of PIECE_ORDER) {
+    if (deckBuilderState.w[pieceType]) cardsW.push(deckBuilderState.w[pieceType]);
+    if (deckBuilderState.b[pieceType]) cardsB.push(deckBuilderState.b[pieceType]);
+  }
+  const errW = validateDeck(Object.entries(deckBuilderState.w).map(([pt, path]) => new Card(pt, path)));
+  const errB = validateDeck(Object.entries(deckBuilderState.b).map(([pt, path]) => new Card(pt, path)));
+  document.getElementById('deck-errors-w').textContent = errW ? errW.join(' ') : '';
+  document.getElementById('deck-errors-b').textContent = errB ? errB.join(' ') : '';
+  const canStart = !errW && !errB && cardsW.length === 5 && cardsB.length === 5;
+  document.getElementById('start-game-btn').disabled = !canStart;
+}
+
+function handleStartGame() {
+  whitePlayer = new Player('White', COLORS.WHITE);
+  blackPlayer = new Player('Black', COLORS.BLACK);
+  for (const pieceType of PIECE_ORDER) {
+    whitePlayer.addCard(new Card(pieceType, deckBuilderState.w[pieceType]));
+    blackPlayer.addCard(new Card(pieceType, deckBuilderState.b[pieceType]));
+  }
+  document.getElementById('deck-builder').classList.add('hidden');
+  if (game) game.init();
+  else { game = new ChessGame(); game.init(); }
+}
+
+function showCardTooltip(event, card) {
+  const existing = document.querySelector('.card-tooltip');
+  if (existing) existing.remove();
+  const ability = card.getCurrentAbility();
+  const div = document.createElement('div');
+  div.className = 'card-tooltip visible';
+  div.innerHTML = `
+    <div class="tt-name">${card.emoji} ${card.pieceName} — ${ability.name}</div>
+    <div class="tt-level">Level ${card.currentLevel}/3 · ${card.pathName}</div>
+    <div class="tt-desc">${ability.description}</div>
+    <div class="tt-use">${ability.strategicUse}</div>
+  `;
+  document.body.appendChild(div);
+  const rect = event.target.getBoundingClientRect();
+  div.style.left = Math.min(rect.left, window.innerWidth - 340) + 'px';
+  div.style.top = (rect.bottom + 8) + 'px';
+}
+
+function hideCardTooltip() {
+  const existing = document.querySelector('.card-tooltip');
+  if (existing) existing.remove();
+}
+
+document.getElementById('start-game-btn').addEventListener('click', handleStartGame);
+document.getElementById('reset-btn').addEventListener('click', () => {
+  initDeckBuilder();
+});
+
+document.getElementById('deck-pool').addEventListener('click', (e) => {
+  const tab = e.target.closest('.pool-tab');
+  if (!tab) return;
+  document.querySelectorAll('.pool-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  poolFilter = tab.dataset.path;
+  renderPoolCards();
+});
+
+initDeckBuilder();
