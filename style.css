@@ -460,7 +460,7 @@ h1 {
 }
 .db-slot.filled.path-movement { border-color: #6b9955; }
 .db-slot.filled.path-attack { border-color: #994e4e; }
-.db-slot.filled.path-defense { border-color: #b8895c; }
+.db-slot.filled.path-defense { border-color: #8ab4d4; }
 
 .db-slot.filled.active {
   border-color: #c49a6c;
@@ -503,7 +503,7 @@ h1 {
 }
 .db-slot .slot-card-name.path-movement { color: #6b9955; }
 .db-slot .slot-card-name.path-attack { color: #994e4e; }
-.db-slot .slot-card-name.path-defense { color: #b8895c; }
+.db-slot .slot-card-name.path-defense { color: #8ab4d4; }
 
 #db-status {
   text-align: center;
@@ -593,12 +593,12 @@ h1 {
 .pool-card.path-movement:hover { border-color: #6b9955; }
 .pool-card.path-attack { border-color: #804242; }
 .pool-card.path-attack:hover { border-color: #994e4e; }
-.pool-card.path-defense { border-color: #a67c52; }
-.pool-card.path-defense:hover { border-color: #b8895c; }
+.pool-card.path-defense { border-color: #7faec9; }
+.pool-card.path-defense:hover { border-color: #8ab4d4; }
 
 .pc-path.path-movement { color: #6b9955; }
 .pc-path.path-attack { color: #994e4e; }
-.pc-path.path-defense { color: #b8895c; }
+.pc-path.path-defense { color: #8ab4d4; }
 
 .pool-card .pc-icon {
   font-size: 1.2rem;
