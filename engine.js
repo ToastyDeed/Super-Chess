@@ -40,10 +40,14 @@ class ChessGame {
     const backRank = [PIECES.ROOK, PIECES.KNIGHT, PIECES.BISHOP, PIECES.QUEEN,
                       PIECES.KING, PIECES.BISHOP, PIECES.KNIGHT, PIECES.ROOK];
     for (let f = 0; f < 8; f++) {
-      this.board[0][f] = { type: backRank[f], color: COLORS.BLACK };
+      const piece = { type: backRank[f], color: COLORS.BLACK };
+      if (backRank[f] === PIECES.KNIGHT) piece.startPos = [0, f];
+      this.board[0][f] = piece;
       this.board[1][f] = { type: PIECES.PAWN, color: COLORS.BLACK, moved: false };
       this.board[6][f] = { type: PIECES.PAWN, color: COLORS.WHITE, moved: false };
-      this.board[7][f] = { type: backRank[f], color: COLORS.WHITE };
+      const piece2 = { type: backRank[f], color: COLORS.WHITE };
+      if (backRank[f] === PIECES.KNIGHT) piece2.startPos = [7, f];
+      this.board[7][f] = piece2;
     }
     this.kingPositions = { w: [7, 4], b: [0, 4] };
   }
@@ -78,6 +82,14 @@ class ChessGame {
     if (!player) return 0;
     const card = player.getCardByPieceType('pawn');
     if (!card || card.pathType !== PATH_TYPES.DEFENSE) return 0;
+    return card.currentLevel;
+  }
+
+  getKnightMovementLevel(color) {
+    const player = getPlayer(color);
+    if (!player) return 0;
+    const card = player.getCardByPieceType('knight');
+    if (!card || card.pathType !== PATH_TYPES.MOVEMENT) return 0;
     return card.currentLevel;
   }
 
@@ -192,6 +204,56 @@ class ChessGame {
         if (this.inBounds(nr, nc) && (!board[nr][nc] || board[nr][nc].color === enemy))
           moves.push([nr, nc]);
       }
+
+      const mLevel = this.getKnightMovementLevel(color);
+      if (mLevel >= 1) {
+        for (const [dr, dc] of [[-3,-1],[-3,1],[-1,-3],[-1,3],[1,-3],[1,3],[3,-1],[3,1]]) {
+          const nr = row + dr, nc = col + dc;
+          if (this.inBounds(nr, nc) && (!board[nr][nc] || board[nr][nc].color === enemy))
+            moves.push([nr, nc]);
+        }
+      }
+
+      if (mLevel >= 2) {
+        const canLand = (nr, nc) => this.inBounds(nr, nc) && (!board[nr][nc] || board[nr][nc].color === enemy);
+        const longFirst = [[-3,-2],[-3,2],[3,-2],[3,2]];
+        const shortFirst = [[-2,-3],[-2,3],[2,-3],[2,3]];
+        for (const [dr, dc] of longFirst) {
+          const sr = Math.sign(dr), sc = Math.sign(dc);
+          for (let i = 1; i <= 3; i++) {
+            const nr = row + sr * i, nc = col;
+            if (!this.inBounds(nr, nc)) break;
+            if (!forAttack && canLand(nr, nc)) moves.push([nr, nc]);
+          }
+          for (let i = 1; i <= 2; i++) {
+            const nr = row + sr * 3, nc = col + sc * i;
+            if (!this.inBounds(nr, nc)) break;
+            if (!canLand(nr, nc)) continue;
+            if (!forAttack || i === 2) moves.push([nr, nc]);
+          }
+        }
+        for (const [dr, dc] of shortFirst) {
+          const sr = Math.sign(dr), sc = Math.sign(dc);
+          for (let i = 1; i <= 3; i++) {
+            const nr = row, nc = col + sc * i;
+            if (!this.inBounds(nr, nc)) break;
+            if (!forAttack && canLand(nr, nc)) moves.push([nr, nc]);
+          }
+          for (let i = 1; i <= 2; i++) {
+            const nr = row + sr * i, nc = col + sc * 3;
+            if (!this.inBounds(nr, nc)) break;
+            if (!canLand(nr, nc)) continue;
+            if (!forAttack || i === 2) moves.push([nr, nc]);
+          }
+        }
+      }
+
+      if (mLevel >= 3 && piece.startPos) {
+        const [sr, sc] = piece.startPos;
+        if (!board[sr][sc] && !forAttack)
+          moves.push([sr, sc]);
+      }
+
       return moves;
     }
 
