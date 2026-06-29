@@ -90,9 +90,10 @@ h1 {
   content: '';
   width: 20px;
   height: 20px;
-  background: rgba(139, 94, 60, 0.4);
+  background: rgba(196, 154, 108, 0.7);
   border-radius: 50%;
   position: absolute;
+  box-shadow: 0 0 6px rgba(196, 154, 108, 0.4);
 }
 
 .square.legal-capture {
