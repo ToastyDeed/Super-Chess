@@ -84,6 +84,14 @@ class ChessGame {
     return card.currentLevel;
   }
 
+  getPawnAttackLevel(color) {
+    const player = color === COLORS.WHITE ? whitePlayer : blackPlayer;
+    if (!player) return 0;
+    const card = player.getCardByPieceType('pawn');
+    if (!card || card.pathType !== PATH_TYPES.ATTACK) return 0;
+    return card.currentLevel;
+  }
+
   cloneBoard() {
     return this.board.map(r => r.map(c => c ? { ...c } : null));
   }
@@ -123,6 +131,7 @@ class ChessGame {
     if (type === PIECES.PAWN) {
       const startRow = color === COLORS.WHITE ? 6 : 1;
       const moveLevel = this.getPawnMovementLevel(color);
+      const atkLevel = this.getPawnAttackLevel(color);
       if (!forAttack) {
         if (this.inBounds(row + dir, col) && !board[row + dir][col])
           moves.push([row + dir, col]);
@@ -145,6 +154,26 @@ class ChessGame {
             moves.push([nr, nc]);
           if (this.enPassantTarget && this.enPassantTarget[0] === nr && this.enPassantTarget[1] === nc)
             moves.push([nr, nc]);
+        }
+      }
+      if (atkLevel >= 1) {
+        const nr = row + dir, nc = col;
+        if (this.inBounds(nr, nc) && board[nr][nc] && board[nr][nc].color === enemy)
+          moves.push([nr, nc]);
+      }
+      if (atkLevel >= 2) {
+        for (const dc of [-1, 1]) {
+          const nr = row + 2 * dir, nc = col + 2 * dc;
+          if (this.inBounds(nr, nc) && board[nr][nc] && board[nr][nc].color === enemy)
+            moves.push([nr, nc]);
+        }
+      }
+      if (!forAttack && atkLevel >= 3) {
+        for (const dc of [-1, 1]) {
+          const midR = row + dir, midC = col + dc;
+          const landR = row + 2 * dir, landC = col + 2 * dc;
+          if (this.inBounds(landR, landC) && board[midR] && board[midR][midC] && board[midR][midC].color === enemy && !board[landR][landC])
+            moves.push([landR, landC]);
         }
       }
       return moves;
@@ -264,6 +293,12 @@ class ChessGame {
     b[fromR][fromC] = null;
     if (isEnPassant) b[fromR][toC] = null;
 
+    if (piece.type === PIECES.PAWN && Math.abs(toR - fromR) === 2 && Math.abs(toC - fromC) === 2 && !b[toR][toC]) {
+      const midR = (fromR + toR) / 2;
+      const midC = (fromC + toC) / 2;
+      b[midR][midC] = null;
+    }
+
     if (isCastle) {
       const backRow = toR;
       const rookFromC = toC === 6 ? 7 : 0;
@@ -306,6 +341,19 @@ class ChessGame {
       capturedPieceRef = captured;
       if (capturedPieceRef.color === COLORS.WHITE) this.capturedWhite.push(capturedPieceRef);
       else this.capturedBlack.push(capturedPieceRef);
+    }
+
+    const isCheckerLeap = piece.type === PIECES.PAWN && !captured &&
+      Math.abs(toR - fromR) === 2 && Math.abs(toC - fromC) === 2;
+    if (isCheckerLeap) {
+      const midR = (fromR + toR) / 2;
+      const midC = (fromC + toC) / 2;
+      capturedPieceRef = this.at(midR, midC);
+      if (capturedPieceRef) {
+        if (capturedPieceRef.color === COLORS.WHITE) this.capturedWhite.push(capturedPieceRef);
+        else this.capturedBlack.push(capturedPieceRef);
+      }
+      this.board[midR][midC] = null;
     }
 
     this.board[toR][toC] = piece;
