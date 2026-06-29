@@ -76,7 +76,7 @@ const CARD_DATA = {
         },
         {
           name: 'Pegasus Lane Jump',
-          description: 'Can move in a wider 3x2 L-shape and can land on any square along that lane. Only delivers a check if it lands at the exact 3x2 destination.',
+          description: 'Can move in a wider 3x2 L-shape and can land on any square along that lane. Only delivers a check on the exact 3x2 destinations.',
           strategicUse: 'Flexible positioning with partial lane landing.'
         },
         {
@@ -97,7 +97,7 @@ const CARD_DATA = {
         },
         {
           name: 'Trample',
-          description: 'Captures all enemy pieces on every square along its movement path to its final destination. Cannot be used to deliver a check.',
+          description: 'When moving, the Knight can choose to capture exactly one enemy piece situated on any of the squares it passes through along its movement trajectory, instead of capturing on its final landing square. The Knight still lands on its intended destination square. Cannot be used to deliver a check.',
           strategicUse: 'Devastating against clustered formations.'
         },
         {
@@ -123,7 +123,7 @@ const CARD_DATA = {
         },
         {
           name: 'Last Stand',
-          description: 'If this is the last surviving Knight on your team, it gains immunity to all enemy modifier card effects.',
+          description: 'If this is the last surviving Knight on your team, it permanently gains the ability to move and deliver checks exactly like a Bishop, in addition to its normal Knight movement.',
           strategicUse: 'Guaranteed value even when outnumbered.'
         }
       ]
