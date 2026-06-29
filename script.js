@@ -31,6 +31,7 @@ class ChessGame {
     this.kingPositions = { w: null, b: null };
     this.castlingRights = { wK: true, wQ: true, bK: true, bQ: true };
     this.enPassantTarget = null;
+    this.soulCaptureTarget = null;
     this.gameOver = false;
     this.lastMove = null;
     this.pendingPromotion = null;
@@ -48,6 +49,7 @@ class ChessGame {
     this.capturedBlack = [];
     this.castlingRights = { wK: true, wQ: true, bK: true, bQ: true };
     this.enPassantTarget = null;
+    this.soulCaptureTarget = null;
     this.gameOver = false;
     this.lastMove = null;
     this.pendingPromotion = null;
@@ -92,6 +94,14 @@ class ChessGame {
     return card.currentLevel;
   }
 
+  getPawnDefenseLevel(color) {
+    const player = color === COLORS.WHITE ? whitePlayer : blackPlayer;
+    if (!player) return 0;
+    const card = player.getCardByPieceType('pawn');
+    if (!card || card.pathType !== PATH_TYPES.DEFENSE) return 0;
+    return card.currentLevel;
+  }
+
   cloneBoard() {
     return this.board.map(r => r.map(c => c ? { ...c } : null));
   }
@@ -132,6 +142,7 @@ class ChessGame {
       const startRow = color === COLORS.WHITE ? 6 : 1;
       const moveLevel = this.getPawnMovementLevel(color);
       const atkLevel = this.getPawnAttackLevel(color);
+      const defLevel = this.getPawnDefenseLevel(color);
       if (!forAttack) {
         if (this.inBounds(row + dir, col) && !board[row + dir][col])
           moves.push([row + dir, col]);
@@ -174,6 +185,23 @@ class ChessGame {
           const landR = row + 2 * dir, landC = col + 2 * dc;
           if (this.inBounds(landR, landC) && board[midR] && board[midR][midC] && board[midR][midC].color === enemy && !board[landR][landC])
             moves.push([landR, landC]);
+        }
+      }
+      if (!forAttack && this.soulCaptureTarget && this.soulCaptureTarget.color === color) {
+        if (Math.abs(row - this.soulCaptureTarget.row) <= 1 && Math.abs(col - this.soulCaptureTarget.col) <= 1) {
+          moves.push([this.soulCaptureTarget.row, this.soulCaptureTarget.col]);
+        }
+      }
+      if (defLevel >= 2) {
+        const nr = row - dir, nc = col;
+        if (this.inBounds(nr, nc) && board[nr][nc] && board[nr][nc].color === enemy)
+          moves.push([nr, nc]);
+      }
+      if (defLevel >= 3) {
+        for (const dc of [-1, 1]) {
+          const nr = row - dir, nc = col + dc;
+          if (this.inBounds(nr, nc) && board[nr][nc] && board[nr][nc].color === enemy)
+            moves.push([nr, nc]);
         }
       }
       return moves;
@@ -327,6 +355,7 @@ class ChessGame {
     const isCastle = piece.type === PIECES.KING && Math.abs(toC - fromC) === 2;
 
     let capturedPieceRef = null;
+    let soulCaptureActivated = false;
 
     if (isEnPassant) {
       capturedPieceRef = this.at(fromR, toC);
@@ -341,6 +370,14 @@ class ChessGame {
       capturedPieceRef = captured;
       if (capturedPieceRef.color === COLORS.WHITE) this.capturedWhite.push(capturedPieceRef);
       else this.capturedBlack.push(capturedPieceRef);
+    }
+
+    if (capturedPieceRef && capturedPieceRef.type === PIECES.PAWN) {
+      const defLevel = this.getPawnDefenseLevel(capturedPieceRef.color);
+      if (defLevel >= 1) {
+        this.soulCaptureTarget = { row: toR, col: toC, color: capturedPieceRef.color };
+        soulCaptureActivated = true;
+      }
     }
 
     const isCheckerLeap = piece.type === PIECES.PAWN && !captured &&
@@ -411,6 +448,10 @@ class ChessGame {
 
     this.lastMove = [[fromR, fromC], [toR, toC]];
     this.moveHistory.push({ from: [fromR, fromC], to: [toR, toC], piece, captured });
+
+    if (!soulCaptureActivated) {
+      this.soulCaptureTarget = null;
+    }
 
     this.turn = this.turn === COLORS.WHITE ? COLORS.BLACK : COLORS.WHITE;
     this.selected = null;
