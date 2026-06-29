@@ -60,8 +60,8 @@ class ChessGame {
                       PIECES.KING, PIECES.BISHOP, PIECES.KNIGHT, PIECES.ROOK];
     for (let f = 0; f < 8; f++) {
       this.board[0][f] = { type: backRank[f], color: COLORS.BLACK };
-      this.board[1][f] = { type: PIECES.PAWN, color: COLORS.BLACK };
-      this.board[6][f] = { type: PIECES.PAWN, color: COLORS.WHITE };
+      this.board[1][f] = { type: PIECES.PAWN, color: COLORS.BLACK, moved: false };
+      this.board[6][f] = { type: PIECES.PAWN, color: COLORS.WHITE, moved: false };
       this.board[7][f] = { type: backRank[f], color: COLORS.WHITE };
     }
     this.kingPositions = { w: [7, 4], b: [0, 4] };
@@ -75,6 +75,14 @@ class ChessGame {
   }
 
   inBounds(row, col) { return row >= 0 && row < 8 && col >= 0 && col < 8; }
+
+  getPawnMovementLevel(color) {
+    const player = color === COLORS.WHITE ? whitePlayer : blackPlayer;
+    if (!player) return 0;
+    const card = player.getCardByPieceType('pawn');
+    if (!card || card.pathType !== PATH_TYPES.MOVEMENT) return 0;
+    return card.currentLevel;
+  }
 
   cloneBoard() {
     return this.board.map(r => r.map(c => c ? { ...c } : null));
@@ -114,11 +122,21 @@ class ChessGame {
 
     if (type === PIECES.PAWN) {
       const startRow = color === COLORS.WHITE ? 6 : 1;
+      const moveLevel = this.getPawnMovementLevel(color);
       if (!forAttack) {
         if (this.inBounds(row + dir, col) && !board[row + dir][col])
           moves.push([row + dir, col]);
-        if (row === startRow && this.inBounds(row + 2 * dir, col) && !board[row + dir][col] && !board[row + 2 * dir][col])
+        const canDoublePush = row === startRow || moveLevel >= 2;
+        if (canDoublePush && this.inBounds(row + 2 * dir, col) && !board[row + dir][col] && !board[row + 2 * dir][col])
           moves.push([row + 2 * dir, col]);
+        if (moveLevel >= 1 && row === startRow && !piece.moved) {
+          if (this.inBounds(row + 3 * dir, col) && !board[row + dir][col] && !board[row + 2 * dir][col] && !board[row + 3 * dir][col])
+            moves.push([row + 3 * dir, col]);
+        }
+        if (moveLevel >= 3) {
+          if (this.inBounds(row - dir, col) && !board[row - dir][col])
+            moves.push([row - dir, col]);
+        }
       }
       for (const dc of [-1, 1]) {
         const nr = row + dir, nc = col + dc;
@@ -322,10 +340,17 @@ class ChessGame {
       if (fromR === 0 && fromC === 7) this.castlingRights.bK = false;
     }
 
-    if (piece.type === PIECES.PAWN && Math.abs(toR - fromR) === 2)
-      this.enPassantTarget = [(fromR + toR) / 2, fromC];
-    else
+    if (piece.type === PIECES.PAWN) {
+      piece.moved = true;
+      if (Math.abs(toR - fromR) >= 2) {
+        const dir2 = piece.color === COLORS.WHITE ? -1 : 1;
+        this.enPassantTarget = [toR - dir2, fromC];
+      } else {
+        this.enPassantTarget = null;
+      }
+    } else {
       this.enPassantTarget = null;
+    }
 
     const player = getPlayer(this.turn);
     if (player) {
