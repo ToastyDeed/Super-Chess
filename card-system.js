@@ -1,5 +1,3 @@
-const PATH_TYPES = { MOVEMENT: 'movement', ATTACK: 'attack', DEFENSE: 'defense' };
-const PIECE_ORDER = ['pawn', 'knight', 'bishop', 'rook', 'queen'];
 const CAPTURE_BONUS = { pawn: 3, knight: 5, bishop: 5, rook: 8, queen: 8 };
 const LEVEL_UP_COST = [0, 5, 10];
 
