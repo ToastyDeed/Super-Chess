@@ -57,9 +57,9 @@ const CARD_DATA = {
           strategicUse: 'Defends against sneaky Knight or Rook flanks without needing to turn around.'
         },
         {
-          name: 'Vanguard',
-          description: 'Trade-off. The pawn forfeits all forward attacking capabilities. In exchange, it can now attack the 5 squares directly behind it and to its immediate left/right sides.',
-          strategicUse: 'Turns your advanced pawns into impenetrable shields that protect your Queen and Rooks from behind.'
+          name: 'X-Strike',
+          description: 'The pawn retains its normal forward movement and forward captures, but can now also capture 1 square diagonally backward. This effectively allows the pawn to capture in a complete \'X\' shape around itself, covering all 4 diagonal corners.',
+          strategicUse: 'Deadly in crowded midgames — enemy pieces can no longer safely sit behind your pawns.'
         }
       ]
     }
