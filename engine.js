@@ -215,43 +215,16 @@ class ChessGame {
       }
 
       if (mLevel >= 2) {
-        const canLand = (nr, nc) => this.inBounds(nr, nc) && (!board[nr][nc] || board[nr][nc].color === enemy);
-        const longFirst = [[-3,-2],[-3,2],[3,-2],[3,2]];
-        const shortFirst = [[-2,-3],[-2,3],[2,-3],[2,3]];
-        for (const [dr, dc] of longFirst) {
-          const sr = Math.sign(dr), sc = Math.sign(dc);
-          for (let i = 1; i <= 3; i++) {
-            const nr = row + sr * i, nc = col;
-            if (!this.inBounds(nr, nc)) break;
-            if (!forAttack && canLand(nr, nc)) moves.push([nr, nc]);
-          }
-          for (let i = 1; i <= 2; i++) {
-            const nr = row + sr * 3, nc = col + sc * i;
-            if (!this.inBounds(nr, nc)) break;
-            if (!canLand(nr, nc)) continue;
-            if (!forAttack || i === 2) moves.push([nr, nc]);
-          }
-        }
-        for (const [dr, dc] of shortFirst) {
-          const sr = Math.sign(dr), sc = Math.sign(dc);
-          for (let i = 1; i <= 3; i++) {
-            const nr = row, nc = col + sc * i;
-            if (!this.inBounds(nr, nc)) break;
-            if (!forAttack && canLand(nr, nc)) moves.push([nr, nc]);
-          }
-          for (let i = 1; i <= 2; i++) {
-            const nr = row + sr * i, nc = col + sc * 3;
-            if (!this.inBounds(nr, nc)) break;
-            if (!canLand(nr, nc)) continue;
-            if (!forAttack || i === 2) moves.push([nr, nc]);
-          }
+        for (const [dr, dc] of [[-3,-2],[-3,2],[-2,-3],[-2,3],[2,-3],[2,3],[3,-2],[3,2]]) {
+          const nr = row + dr, nc = col + dc;
+          if (this.inBounds(nr, nc) && (!board[nr][nc] || board[nr][nc].color === enemy))
+            moves.push([nr, nc]);
         }
       }
 
       if (mLevel >= 3 && piece.startPos) {
         const [sr, sc] = piece.startPos;
-        if (!board[sr][sc] && !forAttack)
-          moves.push([sr, sc]);
+        if (!board[sr][sc]) moves.push([sr, sc]);
       }
 
       return moves;
